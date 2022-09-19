@@ -59,13 +59,13 @@ RN101_quickgelu_yfcc15m = False  # @param{type:"boolean"}
 
 # @markdown ####**Basic Settings:**
 batch_name = 'TimeToDisco'  # @param{type: 'string'}
-steps = 60  # @param [25,50,100,150,250,500,1000]{type: 'raw', allow-input: true}
+steps = 100  # @param [25,50,100,150,250,500,1000]{type: 'raw', allow-input: true}
 # width_height_for_512x512_models = [1280, 768]  # @param{type: 'raw'}
 # clip_guidance_scale = 7000  # @param{type: 'number'}
 tv_scale = 0  # @param{type: 'number'}
 range_scale = 150  # @param{type: 'number'}
 sat_scale = 0  # @param{type: 'number'}
-cutn_batches = 4  # @param{type: 'number'}
+cutn_batches = 1  # @param{type: 'number'}  # NOTE 这里会对图片做数据增强，累计计算n次CLIP的梯度，以此作为guidance。
 skip_augs = False  # @param{type: 'boolean'}
 
 # @markdown ####**Image dimensions to be used for 256x256 models (e.g. pixelart models):**

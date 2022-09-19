@@ -157,6 +157,7 @@ class Diffuser:
         def cond_fn(x, t, y=None):
             with torch.enable_grad():
                 x_is_NaN = False
+                # print(x.shape, '~')
                 x = x.detach().requires_grad_()
                 n = x.shape[0]
                 if use_secondary_model is True:
@@ -173,6 +174,10 @@ class Diffuser:
                     fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
                     x_in = out['pred_xstart'] * fac + x * (1 - fac)
                     x_in_grad = torch.zeros_like(x_in)
+
+                    # print(x_in.shape)
+
+
                 for model_stat in model_stats:
                     for i in range(args.cutn_batches):
                         t_int = int(t.item())+1  # errors on last step without +1, need to find source
@@ -189,10 +194,15 @@ class Diffuser:
                                                 IC_Grey_P=args.cut_icgray_p[1000-t_int],
                                                 args=args,
                                                 )
-                        clip_in = normalize(cuts(x_in.add(1).div(2)))
+                        # 1,3,512,512 --> [16, 3, 224, 224]) batch_size=1的时候没问题就是切了16块出来。再计算联合的loss...
+                        # 直接暴力套一层循环解决问题？因为需要所有loss对原始输入x_in计算loss~
+                        # clip_in = normalize(cuts(x_in.add(1).div(2)))  
+
+                        clip_in = normalize(x_in.add(1).div(2)) # 移除CUTOUT操作。这样是否能解决batch不对劲，并且能加速？
+                        # 这里写法不对，要resize为224x224才能输入到CLIP里,后续解决...
                         image_embeds = model_stat["clip_model"].encode_image(clip_in).float()
                         dists = spherical_dist_loss(image_embeds.unsqueeze(1), model_stat["target_embeds"].unsqueeze(0))
-                        dists = dists.view([args.cut_overview[1000-t_int]+args.cut_innercut[1000-t_int], n, -1])
+                        # dists = dists.view([args.cut_overview[1000-t_int]+args.cut_innercut[1000-t_int], n, -1])
                         losses = dists.mul(model_stat["weights"]).sum(2).mean(0)
                         loss_values.append(losses.sum().item())  # log loss, probably shouldn't do per cutn_batch
                         x_in_grad += torch.autograd.grad(losses.sum() * clip_guidance_scale, x_in)[0] / cutn_batches
@@ -285,20 +295,20 @@ class Diffuser:
                             image.save(f'{outDirPath}/{filename}')
                             if st_dynamic_image:
                                 st_dynamic_image.image(image, use_column_width=True)
-                            self.current_image = image
+                            # self.current_image = image
         return image
-    def get_current_image(self, ):
-        return self.current_image
+        
+    # def get_current_image(self, ):
+    #     return self.current_image
     
 
 if __name__ == '__main__':
-    dd = Diffuser() 
-
+    dd = Diffuser()
     # dd.model_setup(custom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt')
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['东临碣石，以观沧海。水何澹澹，山岛竦峙。'] , 
+    dd.generate(['雷雨，乌云'] , 
                 # init_image=Image.open(fetch('./sunset.jpg')).convert('RGB'),
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,

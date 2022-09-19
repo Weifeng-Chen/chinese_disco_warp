@@ -18,13 +18,13 @@ if __name__ == '__main__':
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面（描述景色）')
     form.form_submit_button("提交")
-    uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png"])
+    uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png","jpeg"])
 
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
     
-    with st.spinner('正在生成中...(预计1min)'):
+    with st.spinner('正在生成中...(预计40s)'):
         capture_img = None
         if uploaded_file is not None:
         # To read file as bytes:
@@ -39,7 +39,7 @@ if __name__ == '__main__':
             with col2:
                 text_scale = st.slider('文本尺度', 1000, 10000, 5000)
             with col3:
-                skip_steps = st.slider('起始点', 10, 30,)
+                skip_steps = st.slider('起始点', 10, 60,)
             image_status = st.empty()
             image_status.image(capture_img, use_column_width=True)
         else:
