@@ -8,9 +8,9 @@ perlin_mode = 'mixed'  # @param ['mixed', 'color', 'gray']
 use_secondary_model = False  # @param {type: 'boolean'}    # set false if you want to use the custom model
 
 # diffusion_model = "512x512_diffusion_uncond_finetune_008100" #@param ["256x256_diffusion_uncond", "512x512_diffusion_uncond_finetune_008100", "portrait_generator_v001", "pixelartdiffusion_expanded", "pixel_art_diffusion_hard_256", "pixel_art_diffusion_soft_256", "pixelartdiffusion4k", "watercolordiffusion_2", "watercolordiffusion", "PulpSciFiDiffusion", "custom"]
-
 diffusion_model = "custom"  # @param ["256x256_diffusion_uncond", "512x512_diffusion_uncond_finetune_008100", "portrait_generator_v001", "pixelartdiffusion_expanded", "pixel_art_diffusion_hard_256", "pixel_art_diffusion_soft_256", "pixelartdiffusion4k", "watercolordiffusion_2", "watercolordiffusion", "PulpSciFiDiffusion", "custom"]
-width_height_for_256x256_models = [512, 448]  # @param{type: 'raw'}
+# diffusion_model = "256x256_diffusion_uncond"  # @param ["256x256_diffusion_uncond", "512x512_diffusion_uncond_finetune_008100", "portrait_generator_v001", "pixelartdiffusion_expanded", "pixel_art_diffusion_hard_256", "pixel_art_diffusion_soft_256", "pixelartdiffusion4k", "watercolordiffusion_2", "watercolordiffusion", "PulpSciFiDiffusion", "custom"]
+width_height_for_256x256_models = [256, 256]  # @param{type: 'raw'}
 kaliyuga_pixel_art_model_names = ['pixelartdiffusion_expanded', 'pixel_art_diffusion_hard_256', 'pixel_art_diffusion_soft_256', 'pixelartdiffusion4k', 'PulpSciFiDiffusion']
 kaliyuga_watercolor_model_names = ['watercolordiffusion', 'watercolordiffusion_2']
 kaliyuga_pulpscifi_model_names = ['PulpSciFiDiffusion']

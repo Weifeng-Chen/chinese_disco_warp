@@ -10,7 +10,7 @@ from transformers import BertForSequenceClassification, BertConfig, BertTokenize
 from secondary_model import SecondaryDiffusionImageNet2
 from glob import glob
 from types import SimpleNamespace
-from CLIP import clip
+import clip
 import lpips
 import json
 from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults

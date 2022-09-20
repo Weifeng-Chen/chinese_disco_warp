@@ -5,7 +5,7 @@ import lpips
 import gc
 from secondary_model import SecondaryDiffusionImageNet2
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
-from CLIP import clip
+import clip
 from types import SimpleNamespace
 from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
 
@@ -15,6 +15,10 @@ from tqdm.notebook import tqdm
 from glob import glob
 import time
 
+
+
+
+batch_size = 3  # NOTE 测试用
 class Diffuser:
     def __init__(self, diffusion_model_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
         self.model_setup(diffusion_model_path)
@@ -155,6 +159,7 @@ class Diffuser:
         cur_t = None
 
         def cond_fn(x, t, y=None):
+            t_start = time.time()
             with torch.enable_grad():
                 x_is_NaN = False
                 # print(x.shape, '~')
@@ -180,8 +185,8 @@ class Diffuser:
 
                 for model_stat in model_stats:
                     for i in range(args.cutn_batches):
-                        t_int = int(t.item())+1  # errors on last step without +1, need to find source
-                        # when using SLIP Base model the dimensions need to be hard coded to avoid AttributeError: 'VisionTransformer' object has no attribute 'input_resolution'
+                        # print(t,'t~~~')
+                        t_int = int(t[0].item())+1 if batch_size > 1 else int(t.item())+1
                         try:
                             input_resolution = model_stat["clip_model"].visual.input_resolution
                         except:
@@ -196,14 +201,37 @@ class Diffuser:
                                                 )
                         # 1,3,512,512 --> [16, 3, 224, 224]) batch_size=1的时候没问题就是切了16块出来。再计算联合的loss...
                         # 直接暴力套一层循环解决问题？因为需要所有loss对原始输入x_in计算loss~
+                        # print(x_in.shape,'x in~~~')
+
+                        test_time_start = time.time()
+                        clip_in = []
+                        for sub_x_in in x_in:
+                            # print(sub_x_in.shape,'clip in~~~')
+                            clip_in.append(normalize(cuts(sub_x_in.unsqueeze(0).add(1).div(2))))
+                        clip_in = torch.concat(clip_in, dim=0)  # batch_size为1的时候为16x3x224x224, 多个sample应该为 (16xn)x3x224x224
+                        # print('time consume1:', time.time() - test_time_start)
+                        # print(clip_in.shape,' clip in~~~')
                         # clip_in = normalize(cuts(x_in.add(1).div(2)))  
 
-                        clip_in = normalize(x_in.add(1).div(2)) # 移除CUTOUT操作。这样是否能解决batch不对劲，并且能加速？
+                        test_time_start = time.time()
                         # 这里写法不对，要resize为224x224才能输入到CLIP里,后续解决...
                         image_embeds = model_stat["clip_model"].encode_image(clip_in).float()
+                        # print("SHAPE:", model_stat["target_embeds"].shape, image_embeds.shape)
+                        # 把target_embeds复制2份。
+                        # print("RESHAPE:", model_stat["target_embeds"].expand(n, -1).shape, image_embeds.view().shape)
+                        # print('time consume2:', time.time() - test_time_start)
+
+                        test_time_start = time.time()
                         dists = spherical_dist_loss(image_embeds.unsqueeze(1), model_stat["target_embeds"].unsqueeze(0))
-                        # dists = dists.view([args.cut_overview[1000-t_int]+args.cut_innercut[1000-t_int], n, -1])
+                        # print('time consume3:', time.time() - test_time_start)
+                        
+                        # print(dists.shape,'s1')
+                        dists = dists.view([args.cut_overview[1000-t_int]+args.cut_innercut[1000-t_int], n, -1])
+                        # print(dists.shape,'s2')
+                        # print('weights shape:::', model_stat["weights"].shape)
+                        
                         losses = dists.mul(model_stat["weights"]).sum(2).mean(0)
+                        # print(losses.shape, 'loss shape~~~')
                         loss_values.append(losses.sum().item())  # log loss, probably shouldn't do per cutn_batch
                         x_in_grad += torch.autograd.grad(losses.sum() * clip_guidance_scale, x_in)[0] / cutn_batches
                 tv_losses = tv_loss(x_in)
@@ -223,6 +251,9 @@ class Diffuser:
                     # print("NaN'd")
                     x_is_NaN = True
                     grad = torch.zeros_like(x)
+                
+                print(time.time()-t_start)
+
             if args.clamp_grad and x_is_NaN == False:
                 magnitude = grad.square().mean().sqrt()
                 return grad * magnitude.clamp(max=args.clamp_max) / magnitude  # min=-0.02, min=-clamp_max,
@@ -274,8 +305,10 @@ class Diffuser:
                     init_image=init,
                     randomize_class=randomize_class,
                     order=2,
-                )
+                )   # 原来的这个sample函数，如果batch_size调大，貌似会非常非常慢。我也原因未知。。。
 
+
+            # tstart = time.time()
             for j, sample in enumerate(samples):
                 cur_t -= 1
                 intermediateStep = False
@@ -284,18 +317,23 @@ class Diffuser:
                         intermediateStep = True
                 elif j in args.intermediate_saves:
                     intermediateStep = True
+                # print('j time:',time.time() - tstart)
+
                 if j % args.display_rate == 0 or cur_t == -1 or intermediateStep == True:
                     for k, image in enumerate(sample['pred_xstart']):
+                        # print(image.shape, 'num image???')
                         # tqdm.write(f'Batch {i}, step {j}, output {k}:')
                         percent = math.ceil(j/total_steps*100)
                         if args.n_batches > 0:
-                            filename = f'{current_time}-{parse_prompt(prompt)[0]}.png'
+                            filename = f'{current_time}-{k}-{parse_prompt(prompt)[0]}.png'
                         image = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                         if j % args.display_rate == 0 or cur_t == -1:
                             image.save(f'{outDirPath}/{filename}')
                             if st_dynamic_image:
                                 st_dynamic_image.image(image, use_column_width=True)
                             # self.current_image = image
+                # print(time.time() - tstart)
+
         return image
         
     # def get_current_image(self, ):
@@ -303,7 +341,7 @@ class Diffuser:
     
 
 if __name__ == '__main__':
-    dd = Diffuser()
+    dd = Diffuser(diffusion_model_path='/home/chenweifeng/disco_project/models/cyberpunk_model100000.pt')
     # dd.model_setup(custom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt')
     image_scale = 1000
     text_scale = 5000

@@ -5,7 +5,7 @@ import lpips
 import gc
 from secondary_model import SecondaryDiffusionImageNet2
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
-from CLIP import clip
+import clip
 from types import SimpleNamespace
 from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
 
@@ -16,7 +16,7 @@ from glob import glob
 import time
 
 class Diffuser:
-    def __init__(self, diffusion_model_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
+    def __init__(self, diffusion_model_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_120000.pt'):
         self.model_setup(diffusion_model_path)
         # self.current_image = None
 
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['东临碣石，以观沧海。水何澹澹，山岛竦峙。'] , 
+    dd.generate(['未来城市'] , 
                 # init_image=Image.open(fetch('./sunset.jpg')).convert('RGB'),
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,
