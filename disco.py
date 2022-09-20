@@ -8,7 +8,6 @@ from transformers import BertForSequenceClassification, BertConfig, BertTokenize
 import clip
 from types import SimpleNamespace
 from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
-
 from ipywidgets import Output
 from datetime import datetime
 from tqdm.notebook import tqdm
@@ -16,9 +15,10 @@ from glob import glob
 import time
 
 class Diffuser:
-    def __init__(self, diffusion_model_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_120000.pt'):
-        self.model_setup(diffusion_model_path)
+    def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
+        self.model_setup(cutom_path)
         # self.current_image = None
+        pass
 
     def model_setup(self, custom_path):
         # LOADING MODEL
@@ -285,15 +285,14 @@ class Diffuser:
                             image.save(f'{outDirPath}/{filename}')
                             if st_dynamic_image:
                                 st_dynamic_image.image(image, use_column_width=True)
-                            self.current_image = image
+                            # self.current_image = image
         return image
-    def get_current_image(self, ):
-        return self.current_image
+    # def get_current_image(self, ):
+    #     return self.current_image
     
 
 if __name__ == '__main__':
-    dd = Diffuser() 
-
+    dd = Diffuser('/home/chenweifeng/disco_project/models/nature_ema_160000.pt') 
     # dd.model_setup(custom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt')
     image_scale = 1000
     text_scale = 5000

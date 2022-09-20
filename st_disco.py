@@ -5,18 +5,18 @@ from PIL import Image
 
 @st.cache(show_spinner=False, allow_output_mutation=True)   # 加装饰器， 只加载一次。
 class ST_Diffuser(Diffuser):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, custom_path):
+        super().__init__(custom_path)
 
     # @st.cache(show_spinner=False)   # 加装饰器， 只加载一次模型
     # def model_setup(self, custom_path):
     #     return super().model_setup(custom_path)
 
 if __name__ == '__main__':
-    dd = ST_Diffuser()  # 初始化
-    
+    dd = ST_Diffuser(custom_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_120000.pt')  # 初始化
+
     form = st.form("参数设置")
-    input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面（描述景色）')
+    input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')
     form.form_submit_button("提交")
     uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png","jpeg"])
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     text_scale = 5000
     skip_steps = 10
     
-    with st.spinner('正在生成中...(预计40s)'):
+    with st.spinner('正在生成中...(预计1min内结束)'):
         capture_img = None
         if uploaded_file is not None:
         # To read file as bytes:
