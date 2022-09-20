@@ -13,7 +13,7 @@ class ST_Diffuser(Diffuser):
     #     return super().model_setup(custom_path)
 
 if __name__ == '__main__':
-    dd = ST_Diffuser(custom_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_120000.pt')  # 初始化
+    dd = ST_Diffuser(custom_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_160000.pt')  # 初始化
 
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')

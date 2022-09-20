@@ -292,8 +292,7 @@ class Diffuser:
     
 
 if __name__ == '__main__':
-    dd = Diffuser('/home/chenweifeng/disco_project/models/nature_ema_160000.pt') 
-    # dd.model_setup(custom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt')
+    dd = Diffuser('/home/chenweifeng/disco_project/models/nature_ema_160000.pt')    # 自然风格图像的模型。
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
