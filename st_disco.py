@@ -1,3 +1,4 @@
+# from disco_huge import Diffuser
 from disco import Diffuser
 import streamlit as st
 from io import BytesIO
@@ -13,7 +14,8 @@ class ST_Diffuser(Diffuser):
     #     return super().model_setup(custom_path)
 
 if __name__ == '__main__':
-    dd = ST_Diffuser(custom_path='/home/chenweifeng/disco_project/models/cyberpunk_ema_160000.pt')  # 初始化
+    # dd = ST_Diffuser(custom_path='./models/cyberpunk_ema_160000.pt')  # 初始化
+    dd = ST_Diffuser(custom_path='./models/nature_ema_160000.pt')  # 初始化
 
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')
@@ -21,7 +23,7 @@ if __name__ == '__main__':
     uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png","jpeg"])
 
     image_scale = 1000
-    text_scale = 5000
+    text_scale = 7500
     skip_steps = 10
     
     with st.spinner('正在生成中...(预计1min内结束)'):
