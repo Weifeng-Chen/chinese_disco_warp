@@ -61,6 +61,8 @@ class Diffuser:
                     init_scale=2000,
                     st_dynamic_image=None,
                     seed = None,
+                    inpainting_mode=False,
+                    inpainting_mask=None,
                     ):
 
         seed = seed
@@ -136,6 +138,15 @@ class Diffuser:
             init = init_image
             init = init.resize((args.side_x, args.side_y), Image.LANCZOS)
             init = TF.to_tensor(init).to(device).unsqueeze(0).mul(2).sub(1)
+
+            if inpainting_mode:
+            # support inpainting
+                mask = inpainting_mask
+                mask = mask.resize((args.side_x, args.side_y), Image.LANCZOS)
+                image_mask_pil_binarized = ((np.array(mask) > 0.5) * 255).astype(np.uint8)
+                # print(image_mask_pil_binarized.shape)
+                mask = TF.to_tensor(Image.fromarray(image_mask_pil_binarized))
+                mask = mask[0, ...].unsqueeze(0).unsqueeze(0).to(device)
 
             if args.perlin_init:
                 # NOTE在原始图像上加perlin（柏林噪声）
@@ -250,7 +261,9 @@ class Diffuser:
                     randomize_class=randomize_class,
                     eta=eta,
                     transformation_fn=symmetry_transformation_fn,
-                    transformation_percent=args.transformation_percent
+                    transformation_percent=args.transformation_percent,
+                    inpainting_mode= inpainting_mode,
+                    mask_inpaint = mask if inpainting_mode else None
                 )
             else:
                 samples = sample_fn(
@@ -280,6 +293,9 @@ class Diffuser:
                         percent = math.ceil(j/total_steps*100)
                         if args.n_batches > 0:
                             filename = f'{current_time}-{parse_prompt(prompt)[0]}.png'
+                        
+                        if inpainting_mode:
+                            image = image * mask[0] + (1-mask[0]) * init[0]
                         image = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                         if j % args.display_rate == 0 or cur_t == -1:
                             image.save(f'{outDirPath}/{filename}')
@@ -287,17 +303,16 @@ class Diffuser:
                                 st_dynamic_image.image(image, use_column_width=True)
                             # self.current_image = image
         return image
-    # def get_current_image(self, ):
-    #     return self.current_image
-    
 
 if __name__ == '__main__':
-    dd = Diffuser('/home/chenweifeng/disco_project/models/nature_ema_160000.pt')    # 自然风格图像的模型。
+    dd = Diffuser('/home/chenweifeng/image_generation_project/disco_project/models/nature_ema_160000.pt')    # 自然风格图像的模型。
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['未来城市'] , 
-                # init_image=Image.open(fetch('./sunset.jpg')).convert('RGB'),
+    dd.generate(['绿色的树叶'] , 
+                init_image=Image.open(fetch('/home/chenweifeng/image_generation_project/disco_project/sunset.jpg')).convert('RGB'),
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,
-                skip_steps=skip_steps,)
+                skip_steps=skip_steps,
+                inpainting_mode=True,
+                inpainting_mask=Image.open(fetch('/home/chenweifeng/image_editing_project/blended-diffusion/input_example/mask2.png')).convert('RGB'))

@@ -17,7 +17,7 @@ import open_clip
 
 class Diffuser:
     def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
-        self.model_setup(cutom_path)cd
+        self.model_setup(cutom_path)
         # self.current_image = None
         pass
 
