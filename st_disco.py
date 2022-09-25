@@ -31,7 +31,7 @@ if __name__ == '__main__':
     realtime_update = st.sidebar.checkbox("Update in realtime", True)
     image_scale = st.sidebar.slider('图像尺度', 1000, 10000,)
     text_scale = st.sidebar.slider('文本尺度', 1000, 10000, 5000)
-    skip_steps = st.sidebar.slider('起始点', 10, 60, 20)
+    skip_steps = st.sidebar.slider('起始点', 0, 60, 20)
 
     c1, c2 = st.columns(2)    
     with c1:
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                                     st_dynamic_image=image_status)   # 最终结果。实时显示修改generate里面的内容。
             else:
                 print(mask.shape)
-                image = dd.generate(input_text,
+                image = dd.generate(input_text_prompts,
                                     capture_img,
                                     inpainting_mode = True,
                                     inpainting_mask = Image.fromarray(mask[:,:,0]),

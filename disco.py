@@ -183,6 +183,11 @@ class Diffuser:
                     out = self.diffusion.p_mean_variance(self.model, x, my_t, clip_denoised=False, model_kwargs={'y': y})
                     fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
                     x_in = out['pred_xstart'] * fac + x * (1 - fac)
+                    # if inpainting_mode:
+                    #     # 此时计算CLIP的时候只能看到mask的部分，背景部分被忽略。
+                    #     # NOTE 只看一部分的话，全局的一致性太差了，效果不好，还是不要这么做了吧。。
+                    #     x_in = x_in * mask
+
                     x_in_grad = torch.zeros_like(x_in)
                 for model_stat in model_stats:
                     for i in range(args.cutn_batches):
@@ -214,6 +219,8 @@ class Diffuser:
                     range_losses = range_loss(out['pred_xstart'])
                 sat_losses = torch.abs(x_in - x_in.clamp(min=-1, max=1)).mean()
                 loss = tv_losses.sum() * tv_scale + range_losses.sum() * range_scale + sat_losses.sum() * sat_scale
+                # if init is not None and init_scale and not inpainting_mode:
+                # inpainting的时候就不要这项loss了
                 if init is not None and init_scale:
                     init_losses = self.lpips_model(x_in, init)
                     loss = loss + init_losses.sum() * init_scale
@@ -295,6 +302,7 @@ class Diffuser:
                             filename = f'{current_time}-{parse_prompt(prompt)[0]}.png'
                         
                         if inpainting_mode:
+                            # 强制背景不变~
                             image = image * mask[0] + (1-mask[0]) * init[0]
                         image = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                         if j % args.display_rate == 0 or cur_t == -1:
