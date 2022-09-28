@@ -234,7 +234,7 @@ image_prompts = {
 
 # @title Do the Run!
 # @markdown `n_batches` ignored with animation modes.
-display_rate = 5  # @param{type: 'number'}
+display_rate = 2  # @param{type: 'number'}
 n_batches = 1  # @param{type: 'number'}
 
 # @markdown If you're having issues with model downloads, check this to compare SHA's:

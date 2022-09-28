@@ -14,6 +14,10 @@ from tqdm.notebook import tqdm
 from glob import glob
 import time
 
+# segmentation
+from clipseg.models.clipseg import CLIPDensePredT
+from torchvision import transforms
+
 class Diffuser:
     def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
         self.model_setup(cutom_path)
@@ -52,6 +56,25 @@ class Diffuser:
         if ViTL14_336px:
             self.clip_models.append(clip.load('ViT-L/14@336px', jit=False)[0].eval().requires_grad_(False).to(device))
         print(f'CLIP Loaded')
+
+        # clip seg
+        self.segmentation_model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
+        self.segmentation_model.eval()
+        self.segmentation_model.load_state_dict(torch.load('/home/chenweifeng/image_generation_project/disco_project/clipseg/weights/rd64-uni.pth', map_location=torch.device('cpu')), strict=False)
+        print("Segementation model loaded")
+
+    def get_seg_mask(self, input_image, prompt):
+        # image = Image.open(image_path)
+        transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Resize((512, 512)),
+        ])
+        img = transform(input_image).unsqueeze(0)
+
+        with torch.no_grad():
+            preds = self.segmentation_model(img, prompt)[0]
+        return torch.sigmoid(preds[0][0])
 
     def generate(self, 
                     input_text_prompts=['夕阳西下'], 
@@ -133,18 +156,21 @@ class Diffuser:
             model_stats.append(model_stat)
 
         init = None
+        mask = None
         if init_image is not None:
             # init = Image.open(fetch(init_image)).convert('RGB')   # 传递的是加载好的图片。而非地址~
             init = init_image
             init = init.resize((args.side_x, args.side_y), Image.LANCZOS)
             init = TF.to_tensor(init).to(device).unsqueeze(0).mul(2).sub(1)
-
+            
             if inpainting_mode:
             # support inpainting
                 mask = inpainting_mask
                 mask = mask.resize((args.side_x, args.side_y), Image.LANCZOS)
                 image_mask_pil_binarized = ((np.array(mask) > 0.5) * 255).astype(np.uint8)
                 # print(image_mask_pil_binarized.shape)
+                image_mask_pil_binarized = cv2.dilate(image_mask_pil_binarized, np.ones((5,5), np.uint8), iterations=3)   # 膨胀，解决不完美的mask
+                image_mask_pil_binarized = cv2.erode(image_mask_pil_binarized, np.ones((5,5), np.uint8), iterations=1)   # 腐蚀，配合上面的，把孔填上。
                 mask = TF.to_tensor(Image.fromarray(image_mask_pil_binarized))
                 mask = mask[0, ...].unsqueeze(0).unsqueeze(0).to(device)
 
@@ -313,14 +339,24 @@ class Diffuser:
         return image
 
 if __name__ == '__main__':
-    dd = Diffuser('/home/chenweifeng/image_generation_project/disco_project/models/nature_ema_160000.pt')    # 自然风格图像的模型。
+    # dd = Diffuser('/home/chenweifeng/image_generation_project/disco_project/models/512x512_diffusion_uncond_finetune_008100.pt')    # 自然风格图像的模型。
+    dd = Diffuser('/home/chenweifeng/image_generation_project/disco_project/models/cyberpunk_ema_160000.pt')    # 自然风格图像的模型。
+
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['绿色的树叶'] , 
-                init_image=Image.open(fetch('/home/chenweifeng/image_generation_project/disco_project/sunset.jpg')).convert('RGB'),
-                clip_guidance_scale=text_scale,
-                init_scale=image_scale,
-                skip_steps=skip_steps,
-                inpainting_mode=True,
-                inpainting_mask=Image.open(fetch('/home/chenweifeng/image_editing_project/blended-diffusion/input_example/mask2.png')).convert('RGB'))
+
+    while True:
+        dd.generate(['新垣结衣，赛博朋克。'] , 
+                    clip_guidance_scale=text_scale,
+                    init_scale=image_scale,
+                    skip_steps=skip_steps,
+                    inpainting_mode=False,)
+
+        # dd.generate(['渊深而鱼聚之，林茂而鸟兽归焉'] , 
+        #             # init_image=Image.open(fetch('/home/chenweifeng/image_generation_project/disco_project/sunset.jpg')).convert('RGB'),
+        #             clip_guidance_scale=text_scale,
+        #             init_scale=image_scale,
+        #             skip_steps=skip_steps,
+        #             inpainting_mode=False,
+        #             inpainting_mask=Image.open(fetch('/home/chenweifeng/image_editing_project/blended-diffusion/input_example/mask2.png')).convert('RGB'))
