@@ -4,7 +4,7 @@ import json
 import lpips
 import gc
 from secondary_model import SecondaryDiffusionImageNet2
-from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
+from transformers import BertForSequenceClassification, BertConfig, BertTokenizer, BertModel
 import clip
 from types import SimpleNamespace
 from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
@@ -13,7 +13,7 @@ from datetime import datetime
 from tqdm.notebook import tqdm
 from glob import glob
 import time
-
+import open_clip
 # segmentation
 from clipseg.models.clipseg import CLIPDensePredT
 from torchvision import transforms
@@ -44,9 +44,16 @@ class Diffuser:
 
         # NOTE Directly Load The Text Encoder From Hugging Face
         print(f'Prepping model...model name: CLIP')
+        self.clip_models = []
+        
+        # self.taiyi_tokenizer = BertTokenizer.from_pretrained("IDEA-CCNL/Taiyi-CLIP-RoBERTa-326M-ViT-H-Chinese")
+        # self.taiyi_transformer = BertModel.from_pretrained("IDEA-CCNL/Taiyi-CLIP-RoBERTa-326M-ViT-H-Chinese").eval()
+        # clip_model, _, processor = open_clip.create_model_and_transforms('ViT-H-14', pretrained='laion2b_s32b_b79k')
+        # clip_model = clip_model.eval().requires_grad_(False).to(device)
+        # self.clip_models.append(clip_model)
+
         self.taiyi_tokenizer = BertTokenizer.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese")
         self.taiyi_transformer = BertForSequenceClassification.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese").eval().to(device)
-        self.clip_models = []
         if ViTB32:
             self.clip_models.append(clip.load('ViT-B/32', jit=False)[0].eval().requires_grad_(False).to(device))
         if ViTB16:
@@ -124,6 +131,10 @@ class Diffuser:
                 # txt = clip_model.encode_text(clip.tokenize(prompt).to(device)).float()
                 # NOTE use chinese CLIP
                 txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt')['input_ids'].to(device)).logits
+                
+                # huge version
+                # txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt', padding=True)['input_ids'])[1].to(device)
+
                 if args.fuzzy_prompt:
                     for i in range(25):
                         model_stat["target_embeds"].append((txt + torch.randn(txt.shape).cuda() * args.rand_mag).clamp(0, 1))
@@ -347,7 +358,7 @@ if __name__ == '__main__':
     skip_steps = 10
 
     while True:
-        dd.generate(['新垣结衣，赛博朋克。'] , 
+        dd.generate(['古道西风瘦马'] , 
                     clip_guidance_scale=text_scale,
                     init_scale=image_scale,
                     skip_steps=skip_steps,
@@ -359,4 +370,4 @@ if __name__ == '__main__':
         #             init_scale=image_scale,
         #             skip_steps=skip_steps,
         #             inpainting_mode=False,
-        #             inpainting_mask=Image.open(fetch('/home/chenweifeng/image_editing_project/blended-diffusion/input_example/mask2.png')).convert('RGB'))
+        #             inpainting_mask=Image.open(fetch('/home/chenweifeng/image_editing_project/blended-diffusion/input_example/mask2.png')).convert
