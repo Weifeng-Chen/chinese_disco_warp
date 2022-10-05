@@ -46,14 +46,14 @@ class Diffuser:
         print(f'Prepping model...model name: CLIP')
         self.clip_models = []
         
-        # self.taiyi_tokenizer = BertTokenizer.from_pretrained("IDEA-CCNL/Taiyi-CLIP-RoBERTa-326M-ViT-H-Chinese")
-        # self.taiyi_transformer = BertModel.from_pretrained("IDEA-CCNL/Taiyi-CLIP-RoBERTa-326M-ViT-H-Chinese").eval()
-        # clip_model, _, processor = open_clip.create_model_and_transforms('ViT-H-14', pretrained='laion2b_s32b_b79k')
+        self.taiyi_tokenizer = BertTokenizer.from_pretrained("wf-genius/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese")
+        self.taiyi_transformer = BertModel.from_pretrained("wf-genius/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese").eval()
+        # clip_model, _, processor = open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')
         # clip_model = clip_model.eval().requires_grad_(False).to(device)
         # self.clip_models.append(clip_model)
 
-        self.taiyi_tokenizer = BertTokenizer.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese")
-        self.taiyi_transformer = BertForSequenceClassification.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese").eval().to(device)
+        # self.taiyi_tokenizer = BertTokenizer.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese")
+        # self.taiyi_transformer = BertForSequenceClassification.from_pretrained("IDEA-CCNL/Taiyi-CLIP-Roberta-large-326M-Chinese").eval().to(device)
         if ViTB32:
             self.clip_models.append(clip.load('ViT-B/32', jit=False)[0].eval().requires_grad_(False).to(device))
         if ViTB16:
@@ -65,10 +65,10 @@ class Diffuser:
         print(f'CLIP Loaded')
 
         # clip seg
-        self.segmentation_model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
-        self.segmentation_model.eval()
-        self.segmentation_model.load_state_dict(torch.load('/home/chenweifeng/image_generation_project/disco_project/clipseg/weights/rd64-uni.pth', map_location=torch.device('cpu')), strict=False)
-        print("Segementation model loaded")
+        # self.segmentation_model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
+        # self.segmentation_model.eval()
+        # self.segmentation_model.load_state_dict(torch.load('/home/chenweifeng/image_generation_project/disco_project/clipseg/weights/rd64-uni.pth', map_location=torch.device('cpu')), strict=False)
+        # print("Segementation model loaded")
 
     def get_seg_mask(self, input_image, prompt):
         # image = Image.open(image_path)
@@ -130,10 +130,10 @@ class Diffuser:
                 txt, weight = parse_prompt(prompt)
                 # txt = clip_model.encode_text(clip.tokenize(prompt).to(device)).float()
                 # NOTE use chinese CLIP
-                txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt')['input_ids'].to(device)).logits
+                # txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt')['input_ids'].to(device)).logits
                 
-                # huge version
-                # txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt', padding=True)['input_ids'])[1].to(device)
+                # huge version --- BertModel version
+                txt = self.taiyi_transformer(self.taiyi_tokenizer(txt, return_tensors='pt', padding=True)['input_ids'])[1].to(device)
 
                 if args.fuzzy_prompt:
                     for i in range(25):

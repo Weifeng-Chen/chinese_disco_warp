@@ -16,14 +16,14 @@ class ST_Diffuser(Diffuser):
     #     return super().model_setup(custom_path)
 
 if __name__ == '__main__':
-    # dd = ST_Diffuser(custom_path='./models/cyberpunk_ema_160000.pt')  # 初始化
+    dd = ST_Diffuser(custom_path='./models/cyberpunk_ema_160000.pt')  # 初始化
     # dd = ST_Diffuser(custom_path='./models/512x512_diffusion_uncond_finetune_008100.pt')  # 初始化
     # dd = ST_Diffuser(custom_path='./models/nature_ema_160000.pt')  # 初始化
-    dd = ST_Diffuser(custom_path='/home/chenweifeng/dataset/animal_output/ema_0.9999_150000.pt')
+    # dd = ST_Diffuser(custom_path='./models/animal_ema_160000.pt')
 
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')
-    seg_text = form.text_input('The area you want to regenerate:',value='',placeholder='Specify the area you want to regenerate')
+    # seg_text = form.text_input('The area you want to regenerate:',value='',placeholder='Specify the area you want to regenerate')
     form.form_submit_button("提交")
     # uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png","jpeg"])
 
@@ -67,12 +67,12 @@ if __name__ == '__main__':
             bytes_data = BytesIO(bytes_data)
             #Image.open()可以读字节流
             capture_img = Image.open(bytes_data).convert('RGB').resize((512, 512))
-            if seg_text:
-                # 文本区域的选区优先级更高
-                mask = dd.get_seg_mask(capture_img, seg_text) 
-                mask = mask.cpu().numpy() + 0.2     # 0.5分割区域太小了貌似
+            # if seg_text:
+            #     # 文本区域的选区优先级更高
+            #     mask = dd.get_seg_mask(capture_img, seg_text) 
+            #     mask = mask.cpu().numpy() + 0.2     # 0.5分割区域太小了貌似
 
-            elif canvas_result.image_data is not None:
+            if canvas_result.image_data is not None:
                 mask = canvas_result.image_data
                 mask = mask[:,:,0]
                 # print(mask)
