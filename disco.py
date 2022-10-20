@@ -65,10 +65,10 @@ class Diffuser:
         print(f'CLIP Loaded')
 
         # clip seg
-        # self.segmentation_model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
-        # self.segmentation_model.eval()
-        # self.segmentation_model.load_state_dict(torch.load('/home/chenweifeng/image_generation_project/disco_project/clipseg/weights/rd64-uni.pth', map_location=torch.device('cpu')), strict=False)
-        # print("Segementation model loaded")
+        self.segmentation_model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
+        self.segmentation_model.eval()
+        self.segmentation_model.load_state_dict(torch.load('/home/chenweifeng/image_generation_project/disco_project/clipseg/weights/rd64-uni.pth', map_location=torch.device('cpu')), strict=False)
+        print("Segementation model loaded")
 
     def get_seg_mask(self, input_image, prompt):
         # image = Image.open(image_path)
@@ -180,7 +180,7 @@ class Diffuser:
                 mask = mask.resize((args.side_x, args.side_y), Image.LANCZOS)
                 image_mask_pil_binarized = ((np.array(mask) > 0.5) * 255).astype(np.uint8)
                 # print(image_mask_pil_binarized.shape)
-                image_mask_pil_binarized = cv2.dilate(image_mask_pil_binarized, np.ones((5,5), np.uint8), iterations=3)   # 膨胀，解决不完美的mask
+                image_mask_pil_binarized = cv2.dilate(image_mask_pil_binarized, np.ones((5,5), np.uint8), iterations=2)   # 膨胀，解决不完美的mask
                 image_mask_pil_binarized = cv2.erode(image_mask_pil_binarized, np.ones((5,5), np.uint8), iterations=1)   # 腐蚀，配合上面的，把孔填上。
                 mask = TF.to_tensor(Image.fromarray(image_mask_pil_binarized))
                 mask = mask[0, ...].unsqueeze(0).unsqueeze(0).to(device)
@@ -357,8 +357,15 @@ if __name__ == '__main__':
     text_scale = 5000
     skip_steps = 10
 
+    prompts = '占卜师在占卜/占卜师在法阵上占卜|塔罗师用塔罗牌进行未来预测|算命先生使用周易进行风水|八字推测|教师在画知识树|老师在组织学生沟通交流|剑客在舞剑|剑客在攻击几匹野狼|镖师在护送货品|一名持盾的人正在抵御刺客的袭击|书生在满是书的书桌上挑灯夜读|书生在图书馆里看书|一群人在一起灵感碰撞|一群人聚在圆桌上交流沟通。'
     while True:
-        dd.generate(['古道西风瘦马'] , 
+        prompt = prompts.split('|')[random.randint(0, len(prompts.split('|'))-1)]
+        if random.random() < 0.5:
+            if random.random() < 0.5:
+                prompt += '，赛博朋克' 
+            else:
+                prompt += '，科幻'
+        dd.generate([prompt] , 
                     clip_guidance_scale=text_scale,
                     init_scale=image_scale,
                     skip_steps=skip_steps,

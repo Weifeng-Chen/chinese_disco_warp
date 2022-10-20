@@ -1,10 +1,10 @@
 # from disco_huge import Diffuser
 from turtle import width
 from disco import Diffuser
-import streamlit as st
 from io import BytesIO
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
+import streamlit as st
 import numpy as np
 @st.cache(show_spinner=False, allow_output_mutation=True)   # 加装饰器， 只加载一次。
 class ST_Diffuser(Diffuser):
@@ -23,12 +23,11 @@ if __name__ == '__main__':
 
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')
-    # seg_text = form.text_input('The area you want to regenerate:',value='',placeholder='Specify the area you want to regenerate')
+    seg_text = form.text_input('The area you want to regenerate:',value='',placeholder='Specify the area you want to regenerate')
     form.form_submit_button("提交")
     # uploaded_file = st.file_uploader("上传初始化图片（可选）", type=["jpg","png","jpeg"])
 
     # Specify canvas parameters in application
-
     stroke_width = st.sidebar.slider("笔刷: ", 5, 25, 15)
     bg_image = st.sidebar.file_uploader("Background image:", type=["png", "jpg"])
     realtime_update = st.sidebar.checkbox("Update in realtime", True)
@@ -67,12 +66,12 @@ if __name__ == '__main__':
             bytes_data = BytesIO(bytes_data)
             #Image.open()可以读字节流
             capture_img = Image.open(bytes_data).convert('RGB').resize((512, 512))
-            # if seg_text:
-            #     # 文本区域的选区优先级更高
-            #     mask = dd.get_seg_mask(capture_img, seg_text) 
-            #     mask = mask.cpu().numpy() + 0.2     # 0.5分割区域太小了貌似
+            if seg_text:
+                # 文本区域的选区优先级更高
+                mask = dd.get_seg_mask(capture_img, seg_text) 
+                mask = mask.cpu().numpy()       # 0.5分割区域太小了貌似
 
-            if canvas_result.image_data is not None:
+            elif canvas_result.image_data is not None:
                 mask = canvas_result.image_data
                 mask = mask[:,:,0]
                 # print(mask)
@@ -81,7 +80,7 @@ if __name__ == '__main__':
         if input_text:
             # global text_prompts
             input_text_prompts = [input_text]
-            print(mask, type(mask))
+            # print(mask, type(mask))
             if not np.any(mask):
                 print('global generate')
                 # mask区域为空，此时直接执行全局的生成
