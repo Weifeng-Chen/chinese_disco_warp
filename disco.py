@@ -3,7 +3,6 @@ import random
 import json
 import lpips
 import gc
-from secondary_model import SecondaryDiffusionImageNet2
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
 import clip
 from types import SimpleNamespace
@@ -13,23 +12,27 @@ from datetime import datetime
 from tqdm.notebook import tqdm
 from glob import glob
 import time
+from transformers import PreTrainedModel
 
 class Diffuser:
     def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
         self.model_setup(cutom_path)
-        # self.current_image = None
-        pass
 
     def model_setup(self, custom_path):
         # LOADING MODEL
-        self.lpips_model = lpips.LPIPS(net='vgg').to(device)
         os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
         print(f'Prepping model...model name: {diffusion_model}')
         self.model, self.diffusion = create_model_and_diffusion(**model_config)
+
+
         if diffusion_model == 'custom':
             self.model.load_state_dict(torch.load(custom_path, map_location='cpu'))
         else:
             self.model.load_state_dict(torch.load(f'{model_path}/{get_model_filename(diffusion_model)}', map_location='cpu'))
+        
+        # self.model.save_pretrained('./diffusion_model')
+        # self.model = PreTrainedModel.from_pretrained('./diffusion_model')
+
         self.model.requires_grad_(False).eval().to(device)
         for name, param in self.model.named_parameters():
             if 'qkv' in name or 'norm' in name or 'proj' in name:
@@ -52,6 +55,7 @@ class Diffuser:
         if ViTL14_336px:
             self.clip_models.append(clip.load('ViT-L/14@336px', jit=False)[0].eval().requires_grad_(False).to(device))
         print(f'CLIP Loaded')
+        # self.lpips_model = lpips.LPIPS(net='vgg').to(device)
 
     def generate(self, 
                     input_text_prompts=['夕阳西下'], 
@@ -159,20 +163,13 @@ class Diffuser:
                 x_is_NaN = False
                 x = x.detach().requires_grad_()
                 n = x.shape[0]
-                if use_secondary_model is True:
-                    alpha = torch.tensor(self.diffusion.sqrt_alphas_cumprod[cur_t], device=device, dtype=torch.float32)
-                    sigma = torch.tensor(self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t], device=device, dtype=torch.float32)
-                    cosine_t = alpha_sigma_to_t(alpha, sigma)
-                    out = secondary_model(x, cosine_t[None].repeat([n])).pred
-                    fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
-                    x_in = out * fac + x * (1 - fac)
-                    x_in_grad = torch.zeros_like(x_in)
-                else:
-                    my_t = torch.ones([n], device=device, dtype=torch.long) * cur_t
-                    out = self.diffusion.p_mean_variance(self.model, x, my_t, clip_denoised=False, model_kwargs={'y': y})
-                    fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
-                    x_in = out['pred_xstart'] * fac + x * (1 - fac)
-                    x_in_grad = torch.zeros_like(x_in)
+                
+                my_t = torch.ones([n], device=device, dtype=torch.long) * cur_t
+                out = self.diffusion.p_mean_variance(self.model, x, my_t, clip_denoised=False, model_kwargs={'y': y})
+                fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
+                x_in = out['pred_xstart'] * fac + x * (1 - fac)
+                x_in_grad = torch.zeros_like(x_in)
+
                 for model_stat in model_stats:
                     for i in range(args.cutn_batches):
                         t_int = int(t.item())+1  # errors on last step without +1, need to find source
@@ -197,10 +194,7 @@ class Diffuser:
                         loss_values.append(losses.sum().item())  # log loss, probably shouldn't do per cutn_batch
                         x_in_grad += torch.autograd.grad(losses.sum() * clip_guidance_scale, x_in)[0] / cutn_batches
                 tv_losses = tv_loss(x_in)
-                if use_secondary_model is True:
-                    range_losses = range_loss(out)
-                else:
-                    range_losses = range_loss(out['pred_xstart'])
+                range_losses = range_loss(out['pred_xstart'])
                 sat_losses = torch.abs(x_in - x_in.clamp(min=-1, max=1)).mean()
                 loss = tv_losses.sum() * tv_scale + range_losses.sum() * range_scale + sat_losses.sum() * sat_scale
                 if init is not None and init_scale:
@@ -287,8 +281,6 @@ class Diffuser:
                                 st_dynamic_image.image(image, use_column_width=True)
                             # self.current_image = image
         return image
-    # def get_current_image(self, ):
-    #     return self.current_image
     
 
 if __name__ == '__main__':
@@ -296,8 +288,7 @@ if __name__ == '__main__':
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['未来城市'] , 
-                # init_image=Image.open(fetch('./sunset.jpg')).convert('RGB'),
+    dd.generate(['东临碣石，以观沧海'] , 
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,
                 skip_steps=skip_steps,)

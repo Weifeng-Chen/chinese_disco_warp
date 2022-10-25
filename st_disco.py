@@ -9,9 +9,6 @@ class ST_Diffuser(Diffuser):
     def __init__(self, custom_path):
         super().__init__(custom_path)
 
-    # @st.cache(show_spinner=False)   # 加装饰器， 只加载一次模型
-    # def model_setup(self, custom_path):
-    #     return super().model_setup(custom_path)
 
 if __name__ == '__main__':
     # dd = ST_Diffuser(custom_path='./models/cyberpunk_ema_160000.pt')  # 初始化
@@ -35,12 +32,10 @@ if __name__ == '__main__':
             bytes_data = BytesIO(bytes_data)
             #Image.open()可以读字节流
             capture_img = Image.open(bytes_data).convert('RGB').resize((512, 512))
-            col1, col2, col3 = st.columns(3)
+            col1, col2,  = st.columns(2)
             with col1:
-                image_scale = st.slider('图像尺度', 1000, 10000,)
-            with col2:
                 text_scale = st.slider('文本尺度', 1000, 10000, 5000)
-            with col3:
+            with col2:
                 skip_steps = st.slider('起始点', 10, 60,)
             image_status = st.empty()
             image_status.image(capture_img, use_column_width=True)

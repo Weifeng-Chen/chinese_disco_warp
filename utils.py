@@ -1,13 +1,10 @@
 import os
 import sys
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-# sys.path.insert(0, f'{PROJECT_DIR}/AdaBins')
-# sys.path.insert(0, f'{PROJECT_DIR}/MiDaS')
 sys.path.insert(0, f'{PROJECT_DIR}/guided-diffusion')   # 加在前面，不再读取库文件的东西。
 
 import random
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
-from secondary_model import SecondaryDiffusionImageNet2
 from glob import glob
 from types import SimpleNamespace
 import clip
@@ -32,27 +29,18 @@ from urllib.parse import urlparse
 from PIL import ImageOps, Image
 from params import *
 
-
-
-# ----------------------------------
-
-
 def createPath(filepath):
     os.makedirs(filepath, exist_ok=True)
-
 
 def wget(url, outputdir):
     res = subprocess.run(['wget', url, '-P', f'{outputdir}'], stdout=subprocess.PIPE).stdout.decode('utf-8')
     print(res)
 
-
 def alpha_sigma_to_t(alpha, sigma):
     return torch.atan2(sigma, alpha) * 2 / math.pi
 
-
 def interp(t):
     return 3 * t**2 - 2 * t ** 3
-
 
 def perlin(width, height, scale=10, device=None):
     gx, gy = torch.randn(2, width + 1, height + 1, 1, 1, device=device)
@@ -66,7 +54,6 @@ def perlin(width, height, scale=10, device=None):
     dots += wx * (1 - wy) * (gx[:-1, 1:] * xs - gy[:-1, 1:] * (1 - ys))
     dots += (1 - wx) * (1 - wy) * (-gx[1:, 1:] * (1 - xs) - gy[1:, 1:] * (1 - ys))
     return dots.permute(0, 2, 1, 3).contiguous().view(width * scale, height * scale)
-
 
 def perlin_ms(octaves, width, height, grayscale, device=None):
     out_array = [0.5] if grayscale else [0.5, 0.5, 0.5]
@@ -83,7 +70,6 @@ def perlin_ms(octaves, width, height, grayscale, device=None):
             oct_height *= 2
     return torch.cat(out_array)
 
-
 def create_perlin_noise(octaves=[1, 1, 1, 1], width=2, height=2, grayscale=True, device=None):
     out = perlin_ms(octaves, width, height, grayscale, device)
     if grayscale:
@@ -96,7 +82,6 @@ def create_perlin_noise(octaves=[1, 1, 1, 1], width=2, height=2, grayscale=True,
 
     out = ImageOps.autocontrast(out)
     return out
-
 
 def regen_perlin(device):
     if perlin_mode == 'color':
@@ -113,7 +98,6 @@ def regen_perlin(device):
     del init2
     return init.expand(batch_size, -1, -1, -1)
 
-
 def fetch(url_or_path):
     if str(url_or_path).startswith('http://') or str(url_or_path).startswith('https://'):
         r = requests.get(url_or_path)
@@ -124,13 +108,11 @@ def fetch(url_or_path):
         return fd
     return open(url_or_path, 'rb')
 
-
 def read_image_workaround(path):
     """OpenCV reads images as BGR, Pillow saves them as RGB. Work around
     this incompatibility to avoid colour inversions."""
     im_tmp = cv2.imread(path)
     return cv2.cvtColor(im_tmp, cv2.COLOR_BGR2RGB)
-
 
 def parse_prompt(prompt):
     if prompt.startswith('http://') or prompt.startswith('https://'):
@@ -141,16 +123,13 @@ def parse_prompt(prompt):
     vals = vals + ['', '1'][len(vals):]
     return vals[0], float(vals[1])
 
-
 def sinc(x):
     return torch.where(x != 0, torch.sin(math.pi * x) / (math.pi * x), x.new_ones([]))
-
 
 def lanczos(x, a):
     cond = torch.logical_and(-a < x, x < a)
     out = torch.where(cond, sinc(x) * sinc(x/a), x.new_zeros([]))
     return out / out.sum()
-
 
 def ramp(ratio, width):
     n = math.ceil(width / ratio + 1)
@@ -160,7 +139,6 @@ def ramp(ratio, width):
         out[i] = cur
         cur += ratio
     return torch.cat([-out[1:].flip([0]), out])[1:-1]
-
 
 def resample(input, size, align_corners=True):
     n, c, h, w = input.shape
@@ -379,111 +357,12 @@ def split_prompts(prompts):
     return prompt_series
 
 
-# def save_settings():
-#     setting_list = {
-#         'text_prompts': text_prompts,
-#         'image_prompts': image_prompts,
-#         'clip_guidance_scale': clip_guidance_scale,
-#         'tv_scale': tv_scale,
-#         'range_scale': range_scale,
-#         'sat_scale': sat_scale,
-#         # 'cutn': cutn,
-#         'cutn_batches': cutn_batches,
-#         'max_frames': max_frames,
-#         'interp_spline': interp_spline,
-#         # 'rotation_per_frame': rotation_per_frame,
-#         'init_image': init_image,
-#         'init_scale': init_scale,
-#         'skip_steps': skip_steps,
-#         # 'zoom_per_frame': zoom_per_frame,
-#         'frames_scale': frames_scale,
-#         'frames_skip_steps': frames_skip_steps,
-#         'perlin_init': perlin_init,
-#         'perlin_mode': perlin_mode,
-#         'skip_augs': skip_augs,
-#         'randomize_class': randomize_class,
-#         'clip_denoised': clip_denoised,
-#         'clamp_grad': clamp_grad,
-#         'clamp_max': clamp_max,
-#         'seed': seed,
-#         'fuzzy_prompt': fuzzy_prompt,
-#         'rand_mag': rand_mag,
-#         'eta': eta,
-#         'width': width_height[0],
-#         'height': width_height[1],
-#         'diffusion_model': diffusion_model,
-#         'use_secondary_model': use_secondary_model,
-#         'steps': steps,
-#         'diffusion_steps': diffusion_steps,
-#         'diffusion_sampling_mode': diffusion_sampling_mode,
-#         'ViTB32': ViTB32,
-#         'ViTB16': ViTB16,
-#         'ViTL14': ViTL14,
-#         'ViTL14_336px': ViTL14_336px,
-#         'RN101': RN101,
-#         'RN50': RN50,
-#         'RN50x4': RN50x4,
-#         'RN50x16': RN50x16,
-#         'RN50x64': RN50x64,
-#         'ViTB32_laion2b_e16': ViTB32_laion2b_e16,
-#         'ViTB32_laion400m_e31': ViTB32_laion400m_e31,
-#         'ViTB32_laion400m_32': ViTB32_laion400m_32,
-#         'ViTB32quickgelu_laion400m_e31': ViTB32quickgelu_laion400m_e31,
-#         'ViTB32quickgelu_laion400m_e32': ViTB32quickgelu_laion400m_e32,
-#         'ViTB16_laion400m_e31': ViTB16_laion400m_e31,
-#         'ViTB16_laion400m_e32': ViTB16_laion400m_e32,
-#         'RN50_yffcc15m': RN50_yffcc15m,
-#         'RN50_cc12m': RN50_cc12m,
-#         'RN50_quickgelu_yfcc15m': RN50_quickgelu_yfcc15m,
-#         'RN50_quickgelu_cc12m': RN50_quickgelu_cc12m,
-#         'RN101_yfcc15m': RN101_yfcc15m,
-#         'RN101_quickgelu_yfcc15m': RN101_quickgelu_yfcc15m,
-#         'cut_overview': str(cut_overview),
-#         'cut_innercut': str(cut_innercut),
-#         'cut_ic_pow': str(cut_ic_pow),
-#         'cut_icgray_p': str(cut_icgray_p),
-#         'key_frames': key_frames,
-#         'max_frames': max_frames,
-#         'angle': angle,
-#         'zoom': zoom,
-#         'translation_x': translation_x,
-#         'translation_y': translation_y,
-#         'translation_z': translation_z,
-#         'rotation_3d_x': rotation_3d_x,
-#         'rotation_3d_y': rotation_3d_y,
-#         'rotation_3d_z': rotation_3d_z,
-#         'midas_depth_model': midas_depth_model,
-#         'midas_weight': midas_weight,
-#         'near_plane': near_plane,
-#         'far_plane': far_plane,
-#         'fov': fov,
-#         'padding_mode': padding_mode,
-#         'sampling_mode': sampling_mode,
-#         'video_init_path': video_init_path,
-#         'extract_nth_frame': extract_nth_frame,
-#         'video_init_seed_continuity': video_init_seed_continuity,
-#         'turbo_mode': turbo_mode,
-#         'turbo_steps': turbo_steps,
-#         'turbo_preroll': turbo_preroll,
-#         'use_horizontal_symmetry': use_horizontal_symmetry,
-#         'use_vertical_symmetry': use_vertical_symmetry,
-#         'transformation_percent': transformation_percent,
-#     }
-#     # print('Settings:', setting_list)
-#     with open(f"{batchFolder}/{batch_name}({batchNum})_settings.txt", "w+") as f:  # save settings
-#         json.dump(setting_list, f, ensure_ascii=False, indent=4)
-
 
 """
 other chaos settings
 """
 # dir settings
-# initDirPath = f'{PROJECT_DIR}/init_images'
-# outDirPath = f'{PROJECT_DIR}/images_out'
-# model_path = f'{PROJECT_DIR}/models'
 
-# initDirPath = f'{PROJECT_DIR}/init_images'
-# createPath(initDirPath)
 outDirPath = f'{PROJECT_DIR}/images_out'
 createPath(outDirPath)
 model_path = f'{PROJECT_DIR}/models'
@@ -581,17 +460,8 @@ model_config.update({
     'diffusion_steps': diffusion_steps,
 })
 
-# @markdown ---
-skip_step_ratio = int(frames_skip_steps.rstrip("%")) / 100
-calc_frames_skip_steps = math.floor(steps * skip_step_ratio)
-if steps <= calc_frames_skip_steps:
-    sys.exit("ERROR: You can't skip more steps than your total steps")
 
 start_frame = 0
-# batchNum = len(glob(batchFolder+"/*.txt"))
-# while os.path.isfile(f"{batchFolder}/{batch_name}({batchNum})_settings.txt") or os.path.isfile(f"{batchFolder}/{batch_name}-{batchNum}_settings.txt"):
-#     batchNum += 1
-
 print(f'Starting Run:')
 if set_seed == 'random_seed':
     random.seed()
@@ -601,35 +471,23 @@ else:
     seed = int(set_seed)
 
 args = {
-    # 'batchNum': batchNum,
-    # 'prompts_series': split_prompts(text_prompts) if text_prompts else None,
     'image_prompts_series': split_prompts(image_prompts) if image_prompts else None,
     # 'seed': seed,
     'display_rate': display_rate,
     'n_batches': n_batches if animation_mode == 'None' else 1,
     'batch_size': batch_size,
-    'batch_name': batch_name,
     'steps': steps,
     'diffusion_sampling_mode': diffusion_sampling_mode,
     'width_height': width_height,
-    # 'clip_guidance_scale': clip_guidance_scale,
     'tv_scale': tv_scale,
     'range_scale': range_scale,
     'sat_scale': sat_scale,
     'cutn_batches': cutn_batches,
-    # 'init_image': init_image,
-    # 'init_scale': init_scale,
-    # 'skip_steps': skip_steps,
     'side_x': side_x,
     'side_y': side_y,
     'timestep_respacing': timestep_respacing,
     'diffusion_steps': diffusion_steps,
     'animation_mode': animation_mode,
-    'video_init_path': video_init_path,
-    'extract_nth_frame': extract_nth_frame,
-    'video_init_seed_continuity': video_init_seed_continuity,
-    'key_frames': key_frames,
-    'max_frames': max_frames if animation_mode != "None" else 1,
     'interp_spline': interp_spline,
     'start_frame': start_frame,
     'angle': angle,
@@ -647,10 +505,6 @@ args = {
     'fov': fov,
     'padding_mode': padding_mode,
     'sampling_mode': sampling_mode,
-    'frames_scale': frames_scale,
-    'skip_step_ratio': skip_step_ratio,
-    'calc_frames_skip_steps': calc_frames_skip_steps,
-    # 'text_prompts': text_prompts,
     'image_prompts': image_prompts,
     'cut_overview': eval(cut_overview),
     'cut_innercut': eval(cut_innercut),
@@ -670,9 +524,6 @@ args = {
     'clip_denoised': clip_denoised,
     'fuzzy_prompt': fuzzy_prompt,
     'rand_mag': rand_mag,
-    'turbo_mode': turbo_mode,
-    'turbo_steps': turbo_steps,
-    'turbo_preroll': turbo_preroll,
     'use_vertical_symmetry': use_vertical_symmetry,
     'use_horizontal_symmetry': use_horizontal_symmetry,
     'transformation_percent': transformation_percent,

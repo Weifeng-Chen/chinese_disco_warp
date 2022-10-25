@@ -18,6 +18,7 @@ from .nn import (
     timestep_embedding,
 )
 
+from transformers import PreTrainedModel, PretrainedConfig
 
 class AttentionPool2d(nn.Module):
     """
@@ -892,3 +893,39 @@ class EncoderUNetModel(nn.Module):
         else:
             h = h.type(x.dtype)
             return self.out(h)
+
+
+class UNetConfig(PretrainedConfig):
+    model_type = "unet"
+    def __init__(
+        self,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+
+class HFUNetModel(PreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.model = UNetModel(
+            image_size=512,
+            in_channels=3,
+            model_channels=256,
+            out_channels=3,
+            num_res_blocks=2,
+            attention_resolutions=[16, 32, 64],
+            dropout=0.0,
+            channel_mult=(0.5, 1, 1, 2, 2, 4, 4),
+            num_classes=None,
+            use_checkpoint=False,
+            use_fp16=True,
+            num_heads=4,
+            num_head_channels=64,
+            num_heads_upsample=-1,
+            use_scale_shift_norm=True,
+            resblock_updown=True,
+            use_new_attention_order=False,
+    )
+    def forward(self, x, timesteps, y=None):
+        return self.model.forward(x, timesteps, y)
+        

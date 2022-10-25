@@ -3,7 +3,7 @@ import inspect
 
 from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
-from .unet import SuperResModel, UNetModel, EncoderUNetModel
+from .unet import SuperResModel, UNetModel, EncoderUNetModel, HFUNetModel, UNetConfig
 
 NUM_CLASSES = 1000
 
@@ -162,7 +162,8 @@ def create_model(
     attention_ds = []
     for res in attention_resolutions.split(","):
         attention_ds.append(image_size // int(res))
-
+    # config = UNetConfig()
+    # return HFUNetModel(config=config)
     return UNetModel(
         image_size=image_size,
         in_channels=3,
