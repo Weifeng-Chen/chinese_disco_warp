@@ -246,4 +246,4 @@ if __name__ == '__main__':
                 init_scale=image_scale,
                 skip_steps=skip_steps,
                 side_x=512,
-                side_y=384,)
+                side_y=512,)

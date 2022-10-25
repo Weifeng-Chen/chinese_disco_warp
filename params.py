@@ -39,7 +39,7 @@ RN101_quickgelu_yfcc15m = False  # @param{type:"boolean"}
 
 # @markdown ####**Basic Settings:**
 
-# NOTE steps可以改这里，需要重新初始化模型，我懒得改接口了。。
+# NOTE steps可以改这里，需要重新初始化模型，我懒得改接口了orz
 steps = 100  # @param [25,50,100,150,250,500,1000]{type: 'raw', allow-input: true}
 tv_scale = 0  # @param{type: 'number'}
 range_scale = 150  # @param{type: 'number'}
