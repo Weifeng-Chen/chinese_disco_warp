@@ -13,7 +13,7 @@ from tqdm.notebook import tqdm
 from glob import glob
 import time
 from transformers import PreTrainedModel
-
+from guided_diffusion.unet import HFUNetModel, UNetConfig
 class Diffuser:
     def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
         self.model_setup(cutom_path)
@@ -21,12 +21,9 @@ class Diffuser:
     def model_setup(self, custom_path):
         # LOADING MODEL
         os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-        print(f'Prepping model...model name: {diffusion_model}')
-        self.model, self.diffusion = create_model_and_diffusion(**model_config)
-
-        self.model.load_state_dict(torch.load(custom_path, map_location='cpu'))
-        # self.model.save_pretrained('./diffusion_model')
-        # self.model = PreTrainedModel.from_pretrained('./diffusion_model')
+        print(f'Prepping model...model name: {custom_path}')
+        __, self.diffusion = create_model_and_diffusion(**model_config)
+        self.model = HFUNetModel.from_pretrained(custom_path)
 
         self.model.requires_grad_(False).eval().to(device)
         for name, param in self.model.named_parameters():
@@ -237,11 +234,12 @@ class Diffuser:
     
 
 if __name__ == '__main__':
-    dd = Diffuser('./models/nature_ema_160000.pt')    # 自然风格图像的模型。
+    custom_path = './nature_uncond_diffusion'
+    dd = Diffuser(custom_path)    # 自然风格图像的模型。
     image_scale = 1000
     text_scale = 5000
     skip_steps = 10
-    dd.generate(['东临碣石，以观沧海'] , 
+    dd.generate(['城市'] , 
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,
                 skip_steps=skip_steps,

@@ -162,27 +162,31 @@ def create_model(
     attention_ds = []
     for res in attention_resolutions.split(","):
         attention_ds.append(image_size // int(res))
+        
     # config = UNetConfig()
     # return HFUNetModel(config=config)
-    return UNetModel(
-        image_size=image_size,
-        in_channels=3,
-        model_channels=num_channels,
-        out_channels=(3 if not learn_sigma else 6),
-        num_res_blocks=num_res_blocks,
-        attention_resolutions=tuple(attention_ds),
-        dropout=dropout,
-        channel_mult=channel_mult,
-        num_classes=(NUM_CLASSES if class_cond else None),
-        use_checkpoint=use_checkpoint,
-        use_fp16=use_fp16,
-        num_heads=num_heads,
-        num_head_channels=num_head_channels,
-        num_heads_upsample=num_heads_upsample,
-        use_scale_shift_norm=use_scale_shift_norm,
-        resblock_updown=resblock_updown,
-        use_new_attention_order=use_new_attention_order,
-    )
+    return None
+
+    
+    # return UNetModel(
+    #     image_size=image_size,
+    #     in_channels=3,
+    #     model_channels=num_channels,
+    #     out_channels=(3 if not learn_sigma else 6),
+    #     num_res_blocks=num_res_blocks,
+    #     attention_resolutions=tuple(attention_ds),
+    #     dropout=dropout,
+    #     channel_mult=channel_mult,
+    #     num_classes=(NUM_CLASSES if class_cond else None),
+    #     use_checkpoint=use_checkpoint,
+    #     use_fp16=use_fp16,
+    #     num_heads=num_heads,
+    #     num_head_channels=num_head_channels,
+    #     num_heads_upsample=num_heads_upsample,
+    #     use_scale_shift_norm=use_scale_shift_norm,
+    #     resblock_updown=resblock_updown,
+    #     use_new_attention_order=use_new_attention_order,
+    # )
 
 
 def create_classifier_and_diffusion(

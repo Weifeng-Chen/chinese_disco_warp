@@ -896,36 +896,80 @@ class EncoderUNetModel(nn.Module):
 
 
 class UNetConfig(PretrainedConfig):
-    model_type = "unet"
     def __init__(
         self,
-        **kwargs,
+        image_size=512,
+        in_channels=3,
+        model_channels=256,
+        out_channels=6,
+        num_res_blocks=2,
+        attention_resolutions=[16, 32, 64],
+        dropout=0.0,
+        channel_mult=(0.5, 1, 1, 2, 2, 4, 4),
+        num_classes=None,
+        use_checkpoint=False,
+        use_fp16=True,
+        num_heads=4,
+        num_head_channels=64,
+        num_heads_upsample=-1,
+        use_scale_shift_norm=True,
+        resblock_updown=True,
+        use_new_attention_order=False, 
+        **kwargs
     ):
+        self.image_size = image_size
+        self.in_channels = in_channels
+        self.model_channels = model_channels
+        self.out_channels = out_channels
+        self.num_res_blocks = num_res_blocks
+        self.attention_resolutions = attention_resolutions
+        self.dropout = dropout
+        self.channel_mult = channel_mult
+        self.num_classes = num_classes
+        self.use_checkpoint = use_checkpoint
+        self.use_fp16 = use_fp16
+        self.num_heads = num_heads
+        self.num_head_channels = num_head_channels
+        self.num_heads_upsample = num_heads_upsample
+        self.use_scale_shift_norm = use_scale_shift_norm
+        self.resblock_updown = resblock_updown
+        self.use_new_attention_order = use_new_attention_order
         super().__init__(**kwargs)
 
 
 class HFUNetModel(PreTrainedModel):
+    config_class  = UNetConfig
+
     def __init__(self, config):
         super().__init__(config)
         self.model = UNetModel(
-            image_size=512,
-            in_channels=3,
-            model_channels=256,
-            out_channels=3,
-            num_res_blocks=2,
-            attention_resolutions=[16, 32, 64],
-            dropout=0.0,
-            channel_mult=(0.5, 1, 1, 2, 2, 4, 4),
-            num_classes=None,
-            use_checkpoint=False,
-            use_fp16=True,
-            num_heads=4,
-            num_head_channels=64,
-            num_heads_upsample=-1,
-            use_scale_shift_norm=True,
-            resblock_updown=True,
-            use_new_attention_order=False,
-    )
+            image_size=config.image_size,
+            in_channels=config.in_channels,
+            model_channels=config.model_channels,
+            out_channels=config.out_channels,
+            num_res_blocks=config.num_res_blocks,
+            attention_resolutions=config.attention_resolutions,
+            dropout=config.dropout,
+            channel_mult=config.channel_mult,
+            num_classes=config.num_classes,
+            use_checkpoint=config.use_checkpoint,
+            use_fp16=config.use_fp16,
+            num_heads=config.num_heads,
+            num_head_channels=config.num_head_channels,
+            num_heads_upsample=config.num_heads_upsample,
+            use_scale_shift_norm=config.use_scale_shift_norm,
+            resblock_updown=config.resblock_updown,
+            use_new_attention_order=config.use_new_attention_order,
+        )   
+      
     def forward(self, x, timesteps, y=None):
         return self.model.forward(x, timesteps, y)
+    
+    def convert_to_fp16(self):
+        """
+        Convert the torso of the model to float16.
+        """
+        self.model.input_blocks.apply(convert_module_to_f16)
+        self.model.middle_block.apply(convert_module_to_f16)
+        self.model.output_blocks.apply(convert_module_to_f16)
         
