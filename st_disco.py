@@ -52,4 +52,3 @@ if __name__ == '__main__':
                                 skip_steps=skip_steps,
                                 st_dynamic_image=image_status)   # 最终结果。实时显示修改generate里面的内容。
             image_status.image(image, use_column_width=True)
-    

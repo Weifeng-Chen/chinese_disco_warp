@@ -6,7 +6,7 @@ import gc
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
 import clip
 from types import SimpleNamespace
-from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults
+from guided_diffusion.script_util import create_model_and_diffusion, model_and_diffusion_defaults, create_gaussian_diffusion
 from ipywidgets import Output
 from datetime import datetime
 from tqdm.notebook import tqdm
@@ -24,12 +24,7 @@ class Diffuser:
         print(f'Prepping model...model name: {diffusion_model}')
         self.model, self.diffusion = create_model_and_diffusion(**model_config)
 
-
-        if diffusion_model == 'custom':
-            self.model.load_state_dict(torch.load(custom_path, map_location='cpu'))
-        else:
-            self.model.load_state_dict(torch.load(f'{model_path}/{get_model_filename(diffusion_model)}', map_location='cpu'))
-        
+        self.model.load_state_dict(torch.load(custom_path, map_location='cpu'))
         # self.model.save_pretrained('./diffusion_model')
         # self.model = PreTrainedModel.from_pretrained('./diffusion_model')
 
@@ -65,6 +60,8 @@ class Diffuser:
                     init_scale=2000,
                     st_dynamic_image=None,
                     seed = None,
+                    side_x=512,
+                    side_y=512,
                     ):
 
         seed = seed
@@ -82,13 +79,6 @@ class Diffuser:
         target_embeds, weights = [], []
         frame_prompt = input_text_prompts
 
-        print(args.image_prompts_series)
-        if args.image_prompts_series is not None and frame_num >= len(args.image_prompts_series):
-            image_prompt = args.image_prompts_series[-1]
-        elif args.image_prompts_series is not None:
-            image_prompt = args.image_prompts_series[frame_num]
-        else:
-            image_prompt = []
 
         print(f'Frame {frame_num} Prompt: {frame_prompt}')
 
@@ -111,22 +101,6 @@ class Diffuser:
                     model_stat["target_embeds"].append(txt)
                     model_stat["weights"].append(weight)
 
-            if image_prompt:
-                model_stat["make_cutouts"] = MakeCutouts(clip_model.visual.input_resolution, cutn, skip_augs=skip_augs)
-                for prompt in image_prompt:
-                    path, weight = parse_prompt(prompt)
-                    img = Image.open(fetch(path)).convert('RGB')
-                    img = TF.resize(img, min(side_x, side_y, *img.size), T.InterpolationMode.LANCZOS)
-                    batch = model_stat["make_cutouts"](TF.to_tensor(img).to(device).unsqueeze(0).mul(2).sub(1))
-                    embed = clip_model.encode_image(normalize(batch)).float()
-                    if fuzzy_prompt:
-                        for i in range(25):
-                            model_stat["target_embeds"].append((embed + torch.randn(embed.shape).cuda() * rand_mag).clamp(0, 1))
-                            weights.extend([weight / cutn] * cutn)
-                    else:
-                        model_stat["target_embeds"].append(embed)
-                        model_stat["weights"].extend([weight / cutn] * cutn)
-
             model_stat["target_embeds"] = torch.cat(model_stat["target_embeds"])
             model_stat["weights"] = torch.tensor(model_stat["weights"], device=device)
             if model_stat["weights"].sum().abs() < 1e-3:
@@ -138,26 +112,10 @@ class Diffuser:
         if init_image is not None:
             # init = Image.open(fetch(init_image)).convert('RGB')   # 传递的是加载好的图片。而非地址~
             init = init_image
-            init = init.resize((args.side_x, args.side_y), Image.LANCZOS)
+            init = init.resize((side_x, side_y), Image.LANCZOS)
             init = TF.to_tensor(init).to(device).unsqueeze(0).mul(2).sub(1)
 
-            if args.perlin_init:
-                # NOTE在原始图像上加perlin（柏林噪声）
-                if args.perlin_mode == 'color':
-                    init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, False)
-                    init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, False)
-                elif args.perlin_mode == 'gray':
-                    init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, True)
-                    init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, True)
-                else:
-                    init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, False)
-                    init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, True)
-                # init = TF.to_tensor(init).add(TF.to_tensor(init2)).div(2).to(device)
-                init = TF.to_tensor(init).add(TF.to_tensor(init2)).div(2).to(device).unsqueeze(0).mul(2).sub(1)
-                del init2
-
         cur_t = None
-
         def cond_fn(x, t, y=None):
             with torch.enable_grad():
                 x_is_NaN = False
@@ -173,7 +131,6 @@ class Diffuser:
                 for model_stat in model_stats:
                     for i in range(args.cutn_batches):
                         t_int = int(t.item())+1  # errors on last step without +1, need to find source
-                        # when using SLIP Base model the dimensions need to be hard coded to avoid AttributeError: 'VisionTransformer' object has no attribute 'input_resolution'
                         try:
                             input_resolution = model_stat["clip_model"].visual.input_resolution
                         except:
@@ -204,7 +161,6 @@ class Diffuser:
                 if torch.isnan(x_in_grad).any() == False:
                     grad = -torch.autograd.grad(x_in, x, x_in_grad)[0]
                 else:
-                    # print("NaN'd")
                     x_is_NaN = True
                     grad = torch.zeros_like(x)
             if args.clamp_grad and x_is_NaN == False:
@@ -228,13 +184,10 @@ class Diffuser:
             cur_t = self.diffusion.num_timesteps - skip_steps - 1
             total_steps = cur_t
 
-            if perlin_init:
-                init = regen_perlin(device)
-
             if args.diffusion_sampling_mode == 'ddim':
                 samples = sample_fn(
                     self.model,
-                    (batch_size, 3, args.side_y, args.side_x),
+                    (batch_size, 3, side_y, side_x),
                     clip_denoised=clip_denoised,
                     model_kwargs={},
                     cond_fn=cond_fn,
@@ -249,7 +202,7 @@ class Diffuser:
             else:
                 samples = sample_fn(
                     self.model,
-                    (batch_size, 3, args.side_y, args.side_x),
+                    (batch_size, 3, side_y, side_x),
                     clip_denoised=clip_denoised,
                     model_kwargs={},
                     cond_fn=cond_fn,
@@ -291,4 +244,6 @@ if __name__ == '__main__':
     dd.generate(['东临碣石，以观沧海'] , 
                 clip_guidance_scale=text_scale,
                 init_scale=image_scale,
-                skip_steps=skip_steps,)
+                skip_steps=skip_steps,
+                side_x=512,
+                side_y=384,)

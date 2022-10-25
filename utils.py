@@ -2,7 +2,6 @@ import os
 import sys
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, f'{PROJECT_DIR}/guided-diffusion')   # 加在前面，不再读取库文件的东西。
-
 import random
 from transformers import BertForSequenceClassification, BertConfig, BertTokenizer
 from glob import glob
@@ -70,33 +69,6 @@ def perlin_ms(octaves, width, height, grayscale, device=None):
             oct_height *= 2
     return torch.cat(out_array)
 
-def create_perlin_noise(octaves=[1, 1, 1, 1], width=2, height=2, grayscale=True, device=None):
-    out = perlin_ms(octaves, width, height, grayscale, device)
-    if grayscale:
-        out = TF.resize(size=(side_y, side_x), img=out.unsqueeze(0))
-        out = TF.to_pil_image(out.clamp(0, 1)).convert('RGB')
-    else:
-        out = out.reshape(-1, 3, out.shape[0]//3, out.shape[1])
-        out = TF.resize(size=(side_y, side_x), img=out)
-        out = TF.to_pil_image(out.clamp(0, 1).squeeze())
-
-    out = ImageOps.autocontrast(out)
-    return out
-
-def regen_perlin(device):
-    if perlin_mode == 'color':
-        init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, False, device)
-        init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, False, device)
-    elif perlin_mode == 'gray':
-        init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, True, device)
-        init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, True, device)
-    else:
-        init = create_perlin_noise([1.5**-i*0.5 for i in range(12)], 1, 1, False, device)
-        init2 = create_perlin_noise([1.5**-i*0.5 for i in range(8)], 4, 4, True, device)
-
-    init = TF.to_tensor(init).add(TF.to_tensor(init2)).div(2).to(device).unsqueeze(0).mul(2).sub(1)
-    del init2
-    return init.expand(batch_size, -1, -1, -1)
 
 def fetch(url_or_path):
     if str(url_or_path).startswith('http://') or str(url_or_path).startswith('https://'):
@@ -313,41 +285,6 @@ def symmetry_transformation_fn(x):
     return x
 
 
-def get_model_filename(diffusion_model_name):
-    model_uri = diff_model_map[diffusion_model_name]['uri_list'][0]
-    model_filename = os.path.basename(urlparse(model_uri).path)
-    return model_filename
-
-
-def download_model(diffusion_model_name, model_path, uri_index=0):
-    if diffusion_model_name != 'custom':
-        model_filename = get_model_filename(diffusion_model_name)
-        model_local_path = os.path.join(model_path, model_filename)
-        if os.path.exists(model_local_path) and check_model_SHA:
-            print(f'Checking {diffusion_model_name} File')
-            with open(model_local_path, "rb") as f:
-                bytes = f.read()
-                hash = hashlib.sha256(bytes).hexdigest()
-            if hash == diff_model_map[diffusion_model_name]['sha']:
-                print(f'{diffusion_model_name} SHA matches')
-                diff_model_map[diffusion_model_name]['downloaded'] = True
-            else:
-                print(f"{diffusion_model_name} SHA doesn't match. Will redownload it.")
-        elif os.path.exists(model_local_path) and not check_model_SHA or diff_model_map[diffusion_model_name]['downloaded']:
-            print(f'{diffusion_model_name} already downloaded. If the file is corrupt, enable check_model_SHA.')
-            diff_model_map[diffusion_model_name]['downloaded'] = True
-
-        if not diff_model_map[diffusion_model_name]['downloaded']:
-            for model_uri in diff_model_map[diffusion_model_name]['uri_list']:
-                wget(model_uri, model_path)
-                if os.path.exists(model_local_path):
-                    diff_model_map[diffusion_model_name]['downloaded'] = True
-                    return
-                else:
-                    print(f'{diffusion_model_name} model download from {model_uri} failed. Will try any fallback uri.')
-            print(f'{diffusion_model_name} download failed.')
-
-
 def split_prompts(prompts):
     prompt_series = pd.Series([np.nan for a in range(max_frames)])
     for i, prompt in prompts.items():
@@ -368,11 +305,6 @@ createPath(outDirPath)
 model_path = f'{PROJECT_DIR}/models'
 createPath(model_path)
 
-# Download the diffusion model(s)
-download_model(diffusion_model, model_path)
-if use_secondary_model:
-    download_model('secondary')
-
 
 # GPU setup
 DEVICE = torch.device('cuda:0' if (torch.cuda.is_available() and not useCPU) else 'cpu')
@@ -383,75 +315,30 @@ if not useCPU:
         print('Disabling CUDNN for A100 gpu', file=sys.stderr)
         torch.backends.cudnn.enabled = False
 
-
 model_config = model_and_diffusion_defaults()
-if diffusion_model == '512x512_diffusion_uncond_finetune_008100':
-    model_config.update({
-        'attention_resolutions': '32, 16, 8',
-        'class_cond': False,
-        'diffusion_steps': 1000,  # No need to edit this, it is taken care of later.
-        'rescale_timesteps': True,
-        'timestep_respacing': 250,  # No need to edit this, it is taken care of later.
-        'image_size': 512,
-        'learn_sigma': True,
-        'noise_schedule': 'linear',
-        'num_channels': 256,
-        'num_head_channels': 64,
-        'num_res_blocks': 2,
-        'resblock_updown': True,
-        'use_checkpoint': use_checkpoint,
-        'use_fp16': not useCPU,
-        'use_scale_shift_norm': True,
-    })
-elif diffusion_model == '256x256_diffusion_uncond':
-    model_config.update({
-        'attention_resolutions': '32, 16, 8',
-        'class_cond': False,
-        'diffusion_steps': 1000,  # No need to edit this, it is taken care of later.
-        'rescale_timesteps': True,
-        'timestep_respacing': 250,  # No need to edit this, it is taken care of later.
-        'image_size': 256,
-        'learn_sigma': True,
-        'noise_schedule': 'linear',
-        'num_channels': 256,
-        'num_head_channels': 64,
-        'num_res_blocks': 2,
-        'resblock_updown': True,
-        'use_checkpoint': use_checkpoint,
-        'use_fp16': not useCPU,
-        'use_scale_shift_norm': True,
-    })
-else:
-    model_config.update({
-        'attention_resolutions': '32, 16, 8',
-        'class_cond': False,
-        'diffusion_steps': 1000,  # No need to edit this, it is taken care of later.
-        'rescale_timesteps': True,
-        'timestep_respacing': 250,  # No need to edit this, it is taken care of later.
-        'image_size': 512,
-        'learn_sigma': True,
-        'noise_schedule': 'linear',
-        'num_channels': 256,
-        'num_head_channels': 64,
-        'num_res_blocks': 2,
-        'resblock_updown': True,
-        'use_checkpoint': use_checkpoint,
-        'use_fp16': not useCPU,
-        'use_scale_shift_norm': True,
-    })
+model_config.update({
+    'attention_resolutions': '32, 16, 8',
+    'class_cond': False,
+    'diffusion_steps': 1000,  # No need to edit this, it is taken care of later.
+    'rescale_timesteps': True,
+    'timestep_respacing': 250,  # No need to edit this, it is taken care of later.
+    'image_size': 512,
+    'learn_sigma': True,
+    'noise_schedule': 'linear',
+    'num_channels': 256,
+    'num_head_channels': 64,
+    'num_res_blocks': 2,
+    'resblock_updown': True,
+    'use_checkpoint': use_checkpoint,
+    'use_fp16': not useCPU,
+    'use_scale_shift_norm': True,
+})
 
 model_default = model_config['image_size']
-if use_secondary_model:
-    secondary_model = SecondaryDiffusionImageNet2()
-    secondary_model.load_state_dict(torch.load(f'{model_path}/secondary_model_imagenet_2.pth', map_location='cpu'))
-    secondary_model.eval().requires_grad_(False).to(device)
-
 normalize = T.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
-# Make folder for batch
-# batchFolder = f'{outDirPath}/{batch_name}'
-# createPath(batchFolder)
-steps_per_checkpoint = steps+10
 
+# Make folder for batch
+steps_per_checkpoint = steps+10
 # Update Model Settings
 timestep_respacing = f'ddim{steps}'
 diffusion_steps = (1000//steps)*steps if steps < 1000 else steps
@@ -471,41 +358,21 @@ else:
     seed = int(set_seed)
 
 args = {
-    'image_prompts_series': split_prompts(image_prompts) if image_prompts else None,
     # 'seed': seed,
     'display_rate': display_rate,
-    'n_batches': n_batches if animation_mode == 'None' else 1,
+    'n_batches': n_batches,
     'batch_size': batch_size,
     'steps': steps,
     'diffusion_sampling_mode': diffusion_sampling_mode,
-    'width_height': width_height,
+    # 'width_height': width_height,
     'tv_scale': tv_scale,
     'range_scale': range_scale,
     'sat_scale': sat_scale,
     'cutn_batches': cutn_batches,
-    'side_x': side_x,
-    'side_y': side_y,
+    # 'side_x': side_x,
+    # 'side_y': side_y,
     'timestep_respacing': timestep_respacing,
     'diffusion_steps': diffusion_steps,
-    'animation_mode': animation_mode,
-    'interp_spline': interp_spline,
-    'start_frame': start_frame,
-    'angle': angle,
-    'zoom': zoom,
-    'translation_x': translation_x,
-    'translation_y': translation_y,
-    'translation_z': translation_z,
-    'rotation_3d_x': rotation_3d_x,
-    'rotation_3d_y': rotation_3d_y,
-    'rotation_3d_z': rotation_3d_z,
-    'midas_depth_model': midas_depth_model,
-    'midas_weight': midas_weight,
-    'near_plane': near_plane,
-    'far_plane': far_plane,
-    'fov': fov,
-    'padding_mode': padding_mode,
-    'sampling_mode': sampling_mode,
-    'image_prompts': image_prompts,
     'cut_overview': eval(cut_overview),
     'cut_innercut': eval(cut_innercut),
     'cut_ic_pow': eval(cut_ic_pow),
@@ -513,8 +380,6 @@ args = {
     'intermediate_saves': intermediate_saves,
     'intermediates_in_subfolder': intermediates_in_subfolder,
     'steps_per_checkpoint': steps_per_checkpoint,
-    'perlin_init': perlin_init,
-    'perlin_mode': perlin_mode,
     'set_seed': set_seed,
     'eta': eta,
     'clamp_grad': clamp_grad,
