@@ -14,6 +14,7 @@ from glob import glob
 import time
 from transformers import PreTrainedModel
 from guided_diffusion.unet import HFUNetModel, UNetConfig
+
 class Diffuser:
     def __init__(self, cutom_path='./nature_uncond_diffusion'):
         self.model_setup(cutom_path)
@@ -234,7 +235,7 @@ class Diffuser:
     
 
 if __name__ == '__main__':
-    custom_path = './nature_uncond_diffusion'
+    custom_path = "wf-genius/nature_uncond_diffusion"
     dd = Diffuser(custom_path)    # 自然风格图像的模型。
     image_scale = 1000
     text_scale = 5000
