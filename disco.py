@@ -15,7 +15,7 @@ import time
 from transformers import PreTrainedModel
 from guided_diffusion.unet import HFUNetModel, UNetConfig
 class Diffuser:
-    def __init__(self, cutom_path='/home/chenweifeng/disco_project/models/nature_ema_160000.pt'):
+    def __init__(self, cutom_path='./nature_uncond_diffusion'):
         self.model_setup(cutom_path)
 
     def model_setup(self, custom_path):
