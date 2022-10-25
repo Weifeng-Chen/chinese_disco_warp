@@ -924,8 +924,9 @@ class HFUNetModel(PreTrainedModel):
             num_heads_upsample=-1,
             use_scale_shift_norm=True,
             resblock_updown=True,
-            use_new_attention_order=False,
-    )
+            use_new_attention_order=False,)
+        self.model.load_state_dict(torch.load(custom_path, map_location='cpu'))
+        
     def forward(self, x, timesteps, y=None):
         return self.model.forward(x, timesteps, y)
         
