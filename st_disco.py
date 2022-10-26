@@ -12,7 +12,7 @@ class ST_Diffuser(Diffuser):
 
 
 if __name__ == '__main__':
-    dd = ST_Diffuser(custom_path='./models/nature_ema_160000.pt')  # 初始化
+    dd = ST_Diffuser(custom_path="wf-genius/nature_uncond_diffusion")  # 初始化
 
     form = st.form("参数设置")
     input_text = form.text_input('输入文本生成图像:',value='',placeholder='你想象的一个画面')
@@ -25,8 +25,7 @@ if __name__ == '__main__':
     skip_steps = int(steps - round(res_skip_steps * steps))
     width = st.sidebar.slider('宽度', 384, 1024, 512, step=64)
     heigth = st.sidebar.slider('高度', 384, 1024, 512, step=64)
-
-    width
+    
     with st.spinner('正在生成中...'):
         capture_img = None
         if uploaded_file is not None:

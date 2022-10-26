@@ -14,6 +14,7 @@ from glob import glob
 import time
 from transformers import PreTrainedModel
 from guided_diffusion.unet import HFUNetModel, UNetConfig
+import argparse
 
 class Diffuser:
     def __init__(self, cutom_path='./nature_uncond_diffusion'):
@@ -235,14 +236,19 @@ class Diffuser:
     
 
 if __name__ == '__main__':
-    custom_path = "wf-genius/nature_uncond_diffusion"
-    dd = Diffuser(custom_path)    # 自然风格图像的模型。
-    image_scale = 1000
-    text_scale = 5000
-    skip_steps = 10
-    dd.generate(['城市'] , 
-                clip_guidance_scale=text_scale,
-                init_scale=image_scale,
-                skip_steps=skip_steps,
-                side_x=512,
-                side_y=512,)
+    parser = argparse.ArgumentParser(description="setting")
+    parser.add_argument('--prompt', type=str, required=True)
+    parser.add_argument('--text_scale', type=int, default=5000)
+    parser.add_argument('--model_path', type=str, default="wf-genius/nature_uncond_diffusion")
+    parser.add_argument('--width', type=int, default=512)
+    parser.add_argument('--height', type=int, default=512)
+
+    user_args = parser.parse_args()
+
+
+    dd = Diffuser(user_args.model_path)    
+    dd.generate([user_args.prompt] , 
+                clip_guidance_scale=user_args.text_scale,
+                side_x=user_args.width,
+                side_y=user_args.height,
+                )
