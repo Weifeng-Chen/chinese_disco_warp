@@ -16,6 +16,10 @@ from transformers import PreTrainedModel
 from guided_diffusion.unet import HFUNetModel, UNetConfig
 import argparse
 
+# def get_parameter_num(model):
+#     total = sum(p.numel() for p in model.parameters()) 
+#     return total
+
 class Diffuser:
     def __init__(self, cutom_path='./nature_uncond_diffusion'):
         self.model_setup(cutom_path)
@@ -26,6 +30,9 @@ class Diffuser:
         print(f'Prepping model...model name: {custom_path}')
         __, self.diffusion = create_model_and_diffusion(**model_config)
         self.model = HFUNetModel.from_pretrained(custom_path)
+        # total = get_parameter_num(self.model)
+        # print("Number of parameter: %.2fM" % (total/1e6))
+        # print("Number of parameter: %.2fM" % (total/1024/1024))
 
         self.model.requires_grad_(False).eval().to(device)
         for name, param in self.model.named_parameters():
